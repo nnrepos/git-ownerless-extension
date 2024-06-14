@@ -118,8 +118,8 @@ async function filterFiles() {
         // Check if the file has a code owner
         const hasCodeOwner = checkCodeOwner(filename, codeOwnersContent);
 
-        if (!hasCodeOwner) {
-            // If there's no code owner, hide the file row
+        if (hasCodeOwner) {
+            // If there's a code owner, hide the file row
             console.log('Hiding file without a code owner:', filename);
             row.closest('.js-details-container').style.display = 'none';
         } else {

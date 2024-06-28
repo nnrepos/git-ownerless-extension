@@ -1,8 +1,6 @@
-// TODOniv: make button prettier.
-// TODOniv: test more codeowner patterns.
-// TODOniv: get github path from user.
+// glob-to-regex: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
 
-// Function to add a custom button
+// add a custom button
 function addButton() {
     // Check if the button already exists
     if (document.getElementById('customButton')) {
@@ -43,7 +41,7 @@ function addButton() {
     }
 }
 
-// Function to fetch the CODEOWNERS file content
+// fetch the CODEOWNERS file content
 async function getCodeOwners() {
     console.log('Fetching CODEOWNERS file content...');
     try {
@@ -67,7 +65,7 @@ async function getCodeOwners() {
     }
 }
 
-// Function to filter files based on code owners
+// filter files based on code owners
 async function filterFiles() {
     console.log('Filtering files...');
     
@@ -128,25 +126,31 @@ async function filterFiles() {
     });
 }
 
-
-// Function to check if a file has a code owner
+// check if a file has a code owner
 function checkCodeOwner(filename, codeOwnersContent) {
     console.log('Checking code owner for file:', filename);
     // Split CODEOWNERS content into lines
     const codeOwnersLines = codeOwnersContent.split('\n');
     
-    // Iterate through each line to find matching patterns
+    // Iterate through each line to find matching pattern
     for (let i = 0; i < codeOwnersLines.length; i++) {
         const line = codeOwnersLines[i].trim();
-        if (line === '' || line.startsWith('#')) continue; // Skip empty lines and comments
+        if (line === '' || line.startsWith('#')) {
+            // Skip empty lines and comments
+            console.log("skipping empty line", i);
+            continue; 
+        }
         
-        // Split each line by whitespace to get patterns and owners
-        const [patterns, ...owners] = line.split(/\s+/);
+        // Split each line by whitespace to get pattern and owners
+        const [pattern, ...owners] = line.split(/\s+/);
 
         // Check if the filename matches any pattern
-        if (patterns.split(/\s+/).some(pattern => new RegExp(pattern).test(filename))) {
+        const regex = globToRegex(pattern, { extended: true });
+
+        if (regex.test(filename)) {
             // If the file matches a pattern, it has a code owner
             console.log('Match found:', line);
+            console.log("file owners:", owners)
             return true;
         }
     }

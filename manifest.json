@@ -12,12 +12,9 @@
   "options_page": "options.html",
   "content_scripts": [
     {
-      "js": ["scripts/content.js"],
-      "matches": [
-        "https://developer.chrome.com/docs/extensions/*",
-        "https://developer.chrome.com/docs/webstore/*",
-        "https://github.com/*"
-      ]
+      "js": ["scripts/content.js", "scripts/glob-to-regex.min.js"],
+      "matches": ["*://github.com/*/pull/*/files",
+                  "*://cto-github.cisco.com/*/pull/*/files"]
     }
   ]
 }

@@ -1,53 +1,24 @@
-// glob-to-regex: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
-
-// add a custom button
-function addButton() {
-    // Check if the button already exists
-    if (document.getElementById('customButton')) {
-        console.log('Button already exists.');
-        return;
-    }
-
-    // Create a new button element
-    const button = document.createElement('button');
-    button.id = 'customButton';
-    button.textContent = 'Filter'; // Less text
-
-    // Add styles to make the button smaller and round
-    button.style.padding = '5px 10px';
-    button.style.borderRadius = '50%'; // Round button
-    button.style.fontSize = '12px';
-    button.style.cursor = 'pointer';
-    button.style.backgroundColor = '#0366d6'; // GitHub button color
-    button.style.color = 'white';
-    button.style.border = 'none';
-
-    console.log('Button created.');
-
-    // Add a click event listener to the button
-    button.addEventListener('click', () => {
-        console.log('Button clicked.');
-        filterFiles();
-    });
-
-    // Find the appropriate place to insert the button
-    const targetDiv = document.querySelector('div.hide-sm.hide-md'); // Select the div with the exact class
-
-    if (targetDiv) {
-        console.log('Inserting button after div with class "hide-sm hide-md".');
-        targetDiv.parentNode.insertBefore(button, targetDiv.nextSibling);
-    } else {
-        console.log('Failed to find div with class "hide-sm hide-md" to insert button after.');
-    }
-}
+// we use glob-to-regex.
+// original code: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
+// the above code is meant for NodeJS. it was modified by chatGPT to support chrome extensions.
 
 // fetch the CODEOWNERS file content
 async function getCodeOwners() {
     console.log('Fetching CODEOWNERS file content...');
     try {
-        // Use regex to replace everything after '/pull/'
-        // TODOniv: get base branch from PR base in active page.
-        const rawURL = window.location.href.replace(/\/pull\/.*$/, '/master/.github/CODEOWNERS')
+        // Extract the base branch from the PR page
+        const baseBranchElement = document.querySelector('.base-ref');
+        var baseBranch = null;
+        if (baseBranchElement){
+            baseBranch = baseBranchElement.textContent.trim();
+            console.log('got the following base branch:', baseBranch)
+        }else{
+            baseBranch = 'master';
+            console.log('could not get base branch. defaulting to master.')
+        }
+        
+        // Use the base branch in the raw URL
+        const rawURL = window.location.href.replace(/\/pull\/.*$/, `/${baseBranch}/.github/CODEOWNERS`)
                                             .replace('github.com', 'raw.githubusercontent.com');
         const response = await fetch(rawURL);
 
@@ -112,16 +83,14 @@ async function filterFiles() {
         }
 
         console.log('Checking file:', filename);
-
-        // Check if the file has a code owner
         const hasCodeOwner = checkCodeOwner(filename, codeOwnersContent);
 
         if (hasCodeOwner) {
-            // If there's a code owner, hide the file row
-            console.log('Hiding file without a code owner:', filename);
+            // hide the file row.
+            console.log('Hiding file which has code owners:', filename);
             row.closest('.js-details-container').style.display = 'none';
         } else {
-            console.log('File has a code owner:', filename);
+            console.log('File does not have code owners:', filename);
         }
     });
 }
@@ -146,12 +115,15 @@ function checkCodeOwner(filename, codeOwnersContent) {
 
         // Check if the filename matches any pattern
         const regex = globToRegex(pattern, { extended: true });
+        console.log("testing pattern", regex);
 
         if (regex.test(filename)) {
-            // If the file matches a pattern, it has a code owner
+            // If the file matches a pattern, it might have a code owner.
             console.log('Match found:', line);
             console.log("file owners:", owners)
-            return true;
+            if (owners.length > 0){
+                return true;
+            }
         }
     }
 
@@ -160,18 +132,10 @@ function checkCodeOwner(filename, codeOwnersContent) {
     return false;
 }
 
-// Check if we are on a GitHub PR files page
-if (window.location.href.includes('github.com') && window.location.href.includes('/pull/')) {
-    console.log('On GitHub PR files page.');
-    if (document.readyState !== 'loading') {
-      addButton();
-    } else {      
-      // Add the button when the page is loaded
-      document.addEventListener('DOMContentLoaded', addButton);
+// Listen for messages from the background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'filterFiles') {
+        filterFiles().then(() => sendResponse({status: 'filtering started'}));
+        return true; // Indicates that the response is asynchronous
     }
-    
-    // Re-add the button when navigating through different tabs in the PR page
-    document.addEventListener('pjax:end', addButton);
-} else {
-    console.log('Not on GitHub PR files page.');
-}
+});

@@ -1,6 +1,6 @@
 // we use glob-to-regex.
 // original code: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
-// the above code is meant for NodeJS. it was modified by chatGPT to support chrome extensions.
+// the above code is meant for NodeJS. it was modified by ChatGPT (GPT-4o) to support chrome extensions.
 
 // fetch the CODEOWNERS file content
 async function getCodeOwners() {

@@ -12,12 +12,11 @@ async function getCodeOwners() {
     try {
         // Extract the base branch from the PR page
         const baseBranchElement = document.querySelector('.base-ref');
-        var baseBranch = null;
+        let baseBranch = 'master';
         if (baseBranchElement) {
             baseBranch = baseBranchElement.textContent.trim();
             console.log('got the following base branch:', baseBranch);
         } else {
-            baseBranch = 'master';
             console.log('could not get base branch. defaulting to master.');
         }
 
@@ -26,7 +25,7 @@ async function getCodeOwners() {
         
         if (window.location.href.includes('cto-github.cisco.com')) {
             rawURL = window.location.href.replace(/\/pull\/.*$/, `/raw/${baseBranch}/.github/CODEOWNERS`);
-        }else{
+        } else {
             rawURL = rawURL.replace('github.com', 'raw.githubusercontent.com');
         }
 
@@ -68,27 +67,27 @@ async function filterFiles() {
     fileRows.forEach(row => {
         // Get the filename element from .Truncate within .file-info
         const filenameElement = row.querySelector('.file-info .Truncate');
-        if (!filenameElement){
+        if (!filenameElement) {
           console.log('Could not get filenameElement.');
           return;
         }
         
-        var filenameSubElement = null;
-        for (var i = 0; i < filenameElement.childNodes.length; i++) {
-            if (filenameElement.childNodes[i].className == "Link--primary Truncate-text") {
+        let filenameSubElement = null;
+        for (let i = 0; i < filenameElement.childNodes.length; i++) {
+            if (filenameElement.childNodes[i].className === "Link--primary Truncate-text") {
               filenameSubElement = filenameElement.childNodes[i];
               break;
             }        
         }
 
-        if (!filenameSubElement){
+        if (!filenameSubElement) {
           console.log('Could not get filenameSubElement.');
           return;
         }
 
         // Get the title attribute from the .Truncate element
         const filename = filenameSubElement.getAttribute('title');
-        if (!filename){
+        if (!filename) {
           console.log('Could not get filename.');
           return;
         }
@@ -105,48 +104,92 @@ async function filterFiles() {
     });
 }
 
-// check if a file has a code owners
+// check if a file has a code owner
 function checkCodeOwners(filename, codeOwnersContent) {
-    // TODO: support renamed files (use new name after `→` symbol).
     console.log('Checking code owners for file:', filename);
     // Split CODEOWNERS content into lines
     const codeOwnersLines = codeOwnersContent.split('\n');
     
+    let matched = false;
+    let hasOwner = false;
+    
     // Iterate through each line to find matching pattern
     for (let i = 0; i < codeOwnersLines.length; i++) {
-        const line = codeOwnersLines[i].trim();
+        let line = codeOwnersLines[i].trim();
         if (line === '' || line.startsWith('#')) {
             // Skip empty lines and comments
             continue; 
         }
         
         // Split each line by whitespace to get pattern and owners
-        const [pattern, ...owners] = line.split(/\s+/);
+        let [pattern, ...owners] = line.split(/\s+/);
+
+        // Handle inline comments
+        const commentIndex = pattern.indexOf('#');
+        if (commentIndex > -1) {
+            pattern = pattern.substring(0, commentIndex).trim();
+        }
+
+        if (pattern === '') {
+            continue;
+        }
 
         // Check if the filename matches any pattern
-        const regex = globToRegex(pattern, { extended: true });
+        const regex = convertGlobToRegExp(pattern);
         console.log('testing regex:', regex);
 
         if (regex.test(filename)) {
-            // If the file matches a pattern, it might have code owners.
+            matched = true;
             console.log('Match found:', line);
             console.log('regex:', regex);
             console.log("file owners:", owners);
-            if (owners.length > 0){
-                return true;
+            if (owners.length > 0) {
+                hasOwner = true;
+            } else {
+                hasOwner = false;
             }
         }
     }
 
-    // If no match found, the file doesn't have code owners.
-    console.log('No match found for file:', filename);
-    return false;
+    // Return true if matched and has owner, or if matched and does not have owner (to support later match)
+    return matched && hasOwner;
+}
+
+// Convert a glob pattern to a regular expression
+function convertGlobToRegExp(glob) {
+    const specialChars = "\\^$*+?.()|{}[]";
+    let regexString = "^";
+
+    for (let i = 0; i < glob.length; i++) {
+        const c = glob.charAt(i);
+        if (c === '*') {
+            if (i > 0 && glob.charAt(i - 1) === '*') {
+                regexString += ".*";
+            } else {
+                regexString += ".*?";
+            }
+        } else if (specialChars.indexOf(c) >= 0) {
+            regexString += "\\" + c;
+        } else {
+            regexString += c;
+        }
+    }
+    
+    // If the pattern does not end with a '/', it should match both the exact name and as a directory prefix.
+    if (!glob.endsWith('/')) {
+        regexString += "(?:/.*)?";
+    }
+
+    // Ensure the regex is case-sensitive
+    regexString += "$";
+    return new RegExp(regexString);
 }
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'filterFiles') {
         filterFiles().then(() => sendResponse({status: 'filtering started'}));
-        return true; // Indicates that the response is asynchronous
+        // Indicates that the response is asynchronous.
+        return true;
     }
 });

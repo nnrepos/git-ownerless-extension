@@ -157,31 +157,49 @@ function checkCodeOwners(filename, codeOwnersContent) {
 
 // Convert a glob pattern to a regular expression
 function convertGlobToRegExp(glob) {
-    const specialChars = "\\^$*+?.()|{}[]";
     let regexString = "(^|/)";
+    let inGroup = false;
+    let escapeNext = false;
 
-    for (let i = 0; i < glob.length; i++) {
-        const c = glob.charAt(i);
-        if (c === '*') {
-            if (i > 0 && glob.charAt(i - 1) === '*') {
-                regexString += ".*";
-            } else {
-                regexString += ".*?";
-            }
-        } else if (specialChars.indexOf(c) >= 0) {
-            regexString += "\\" + c;
+    for (let char of glob) {
+        if (escapeNext) {
+            regexString += "\\" + char;
+            escapeNext = false;
         } else {
-            regexString += c;
+            switch (char) {
+                case '\\':
+                    escapeNext = true;
+                    break;
+                case '*':
+                    regexString += ".*";
+                    break;
+                case '?':
+                    regexString += ".";
+                    break;
+                case '{':
+                    inGroup = true;
+                    regexString += "(";
+                    break;
+                case '}':
+                    inGroup = false;
+                    regexString += ")";
+                    break;
+                case ',':
+                    regexString += inGroup ? "|" : ",";
+                    break;
+                default:
+                    regexString += char;
+            }
         }
     }
-    
-    // If the pattern does not end with a '/', it should match both the exact name and as a directory prefix.
-    if (!glob.endsWith('/')) {
-        regexString += "(?:/.*)?";
+
+    // Allow for matching both directories and files within directories
+    if (!regexString.endsWith("/")) {
+        regexString += "(?:$|/.*$)";
+    } else {
+        regexString += ".*$";
     }
 
-    // Ensure the regex is case-sensitive
-    regexString += "$";
     return new RegExp(regexString);
 }
 

@@ -2,6 +2,10 @@
 // original code: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
 // the above code is meant for NodeJS. it was modified by ChatGPT (GPT-4o) to support chrome extensions.
 
+// TODO: add 2 new buttons when clicking on filter symbol:
+//       1. filter with debug mode: set variable debug=True and print every pattern.
+//       2. add `about` page which redirects to the extension's download link.
+
 // fetch the CODEOWNERS file content
 async function getCodeOwners() {
     console.log('Fetching CODEOWNERS file content...');
@@ -9,17 +13,24 @@ async function getCodeOwners() {
         // Extract the base branch from the PR page
         const baseBranchElement = document.querySelector('.base-ref');
         var baseBranch = null;
-        if (baseBranchElement){
+        if (baseBranchElement) {
             baseBranch = baseBranchElement.textContent.trim();
-            console.log('got the following base branch:', baseBranch)
-        }else{
+            console.log('got the following base branch:', baseBranch);
+        } else {
             baseBranch = 'master';
-            console.log('could not get base branch. defaulting to master.')
+            console.log('could not get base branch. defaulting to master.');
         }
+
+        // Construct the raw URL.
+        let rawURL = window.location.href.replace(/\/pull\/.*$/, `/${baseBranch}/.github/CODEOWNERS`);
         
-        // Use the base branch in the raw URL
-        const rawURL = window.location.href.replace(/\/pull\/.*$/, `/${baseBranch}/.github/CODEOWNERS`)
-                                            .replace('github.com', 'raw.githubusercontent.com');
+        if (window.location.href.includes('cto-github.cisco.com')) {
+            rawURL = window.location.href.replace(/\/pull\/.*$/, `/raw/${baseBranch}/.github/CODEOWNERS`);
+        }else{
+            rawURL = rawURL.replace('github.com', 'raw.githubusercontent.com');
+        }
+
+        console.log("full CODEOWNERS raw path:", rawURL);
         const response = await fetch(rawURL);
 
         // Fetch the CODEOWNERS file content from GitHub
@@ -82,10 +93,9 @@ async function filterFiles() {
           return;
         }
 
-        console.log('Checking file:', filename);
-        const hasCodeOwner = checkCodeOwner(filename, codeOwnersContent);
+        const hasCodeOwners = checkCodeOwners(filename, codeOwnersContent);
 
-        if (hasCodeOwner) {
+        if (hasCodeOwners) {
             // hide the file row.
             console.log('Hiding file which has code owners:', filename);
             row.closest('.js-details-container').style.display = 'none';
@@ -95,9 +105,10 @@ async function filterFiles() {
     });
 }
 
-// check if a file has a code owner
-function checkCodeOwner(filename, codeOwnersContent) {
-    console.log('Checking code owner for file:', filename);
+// check if a file has a code owners
+function checkCodeOwners(filename, codeOwnersContent) {
+    // TODO: support renamed files (use new name after `→` symbol).
+    console.log('Checking code owners for file:', filename);
     // Split CODEOWNERS content into lines
     const codeOwnersLines = codeOwnersContent.split('\n');
     
@@ -106,7 +117,6 @@ function checkCodeOwner(filename, codeOwnersContent) {
         const line = codeOwnersLines[i].trim();
         if (line === '' || line.startsWith('#')) {
             // Skip empty lines and comments
-            console.log("skipping empty line", i);
             continue; 
         }
         
@@ -115,19 +125,20 @@ function checkCodeOwner(filename, codeOwnersContent) {
 
         // Check if the filename matches any pattern
         const regex = globToRegex(pattern, { extended: true });
-        console.log("testing pattern", regex);
+        console.log('testing regex:', regex);
 
         if (regex.test(filename)) {
-            // If the file matches a pattern, it might have a code owner.
+            // If the file matches a pattern, it might have code owners.
             console.log('Match found:', line);
-            console.log("file owners:", owners)
+            console.log('regex:', regex);
+            console.log("file owners:", owners);
             if (owners.length > 0){
                 return true;
             }
         }
     }
 
-    // If no match found, the file doesn't have a code owner
+    // If no match found, the file doesn't have code owners.
     console.log('No match found for file:', filename);
     return false;
 }

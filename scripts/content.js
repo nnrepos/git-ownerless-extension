@@ -158,7 +158,7 @@ function checkCodeOwners(filename, codeOwnersContent) {
 // Convert a glob pattern to a regular expression
 function convertGlobToRegExp(glob) {
     const specialChars = "\\^$*+?.()|{}[]";
-    let regexString = "^";
+    let regexString = "(^|/)";
 
     for (let i = 0; i < glob.length; i++) {
         const c = glob.charAt(i);

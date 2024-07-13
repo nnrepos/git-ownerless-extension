@@ -1,7 +1,3 @@
-// we use glob-to-regex.
-// original code: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
-// the above code is meant for NodeJS. it was modified by ChatGPT (GPT-4o) to support chrome extensions.
-
 // TODO: add 2 new buttons when clicking on filter symbol:
 //       1. filter with debug mode: set variable debug=True and print every pattern.
 //       2. add `about` page which redirects to the extension's download link.

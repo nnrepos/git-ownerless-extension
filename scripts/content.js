@@ -1,6 +1,3 @@
-// TODO: add 2 new buttons when clicking on filter symbol:
-//       1. filter with debug mode: set variable debug=True and print every pattern.
-//       2. add `about` page which redirects to the extension's download link.
 
 // fetch the CODEOWNERS file content
 async function getCodeOwners() {
@@ -43,25 +40,23 @@ async function getCodeOwners() {
 }
 
 // filter files based on code owners
-async function filterFiles() {
+async function filterFiles(debug = false) {
     console.log('Filtering files...');
-    
-    // Get the CODEOWNERS file content
+
     const codeOwnersContent = await getCodeOwners();
-    console.log('CODEOWNERS file content:', codeOwnersContent);
+    if (debug){
+        console.log('CODEOWNERS file content:', codeOwnersContent);
+    }
     
     if (!codeOwnersContent) {
         console.log('Failed to fetch CODEOWNERS file content.');
         return;
     }
 
-    // Get all file rows
     const fileRows = document.querySelectorAll('.file-info');
     console.log('Found', fileRows.length, 'file rows.');
 
-    // Loop through each file row
     fileRows.forEach(row => {
-        // Get the filename element from .Truncate within .file-info
         const filenameElement = row.querySelector('.file-info .Truncate');
         if (!filenameElement) {
           console.log('Could not get filenameElement.');
@@ -81,35 +76,31 @@ async function filterFiles() {
           return;
         }
 
-        // Get the title attribute from the .Truncate element
         const filename = filenameSubElement.getAttribute('title');
         if (!filename) {
           console.log('Could not get filename.');
           return;
         }
 
-        const hasCodeOwners = checkCodeOwners(filename, codeOwnersContent);
+        const hasCodeOwners = checkCodeOwners(filename, codeOwnersContent, debug);
 
         if (hasCodeOwners) {
-            // hide the file row.
             console.log('Hiding file which has code owners:', filename);
             row.closest('.js-details-container').style.display = 'none';
         } else {
             console.log('File does not have code owners:', filename);
         }
+
     });
 }
 
-// check if a file has a code owner
-function checkCodeOwners(filename, codeOwnersContent) {
+function checkCodeOwners(filename, codeOwnersContent, debug) {
     console.log('Checking code owners for file:', filename);
-    // Split CODEOWNERS content into lines
     const codeOwnersLines = codeOwnersContent.split('\n');
     
     let matched = false;
     let hasOwner = false;
     
-    // Iterate through each line to find matching pattern
     for (let i = 0; i < codeOwnersLines.length; i++) {
         let line = codeOwnersLines[i].trim();
         if (line === '' || line.startsWith('#')) {
@@ -132,7 +123,9 @@ function checkCodeOwners(filename, codeOwnersContent) {
 
         // Check if the filename matches any pattern
         const regex = convertGlobToRegExp(pattern);
-        console.log('testing regex:', regex);
+        if (debug){
+            console.log('testing regex:', regex);
+        }
 
         if (regex.test(filename)) {
             matched = true;
@@ -147,11 +140,9 @@ function checkCodeOwners(filename, codeOwnersContent) {
         }
     }
 
-    // Return true if matched and has owner, or if matched and does not have owner (to support later match)
     return matched && hasOwner;
 }
 
-// Convert a glob pattern to a regular expression
 function convertGlobToRegExp(glob) {
     let regexString = "(^|/)";
     let inGroup = false;
@@ -203,6 +194,10 @@ function convertGlobToRegExp(glob) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'filterFiles') {
         filterFiles().then(() => sendResponse({status: 'filtering started'}));
+        // Indicates that the response is asynchronous.
+        return true;
+    } else if (request.action === 'filterFilesDebug') {
+        filterFiles(true).then(() => sendResponse({status: 'debug filtering started'}));
         // Indicates that the response is asynchronous.
         return true;
     }

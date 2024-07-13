@@ -1,0 +1,7 @@
+.git
+.zipignore
+.gitignore
+README.md
+build_zip
+not\ for\ build/*
+LICENSE

@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "github ownerless diff filter",
-  "version": "0.1",
+  "version": "0.2",
   "description": "show files in pull request diffs which have no code owners",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "background": {
     "service_worker": "scripts/background.js"
@@ -16,10 +17,9 @@
     "48": "images/icon-48.png",
     "128": "images/icon-128.png"
   },
-  "options_page": "options.html",
   "content_scripts": [
     {
-      "js": ["scripts/content.js", "scripts/glob-to-regex.min.js"],
+      "js": ["scripts/content.js"],
       "matches": ["*://github.com/*/pull/*",
                   "*://cto-github.cisco.com/*/pull/*"]
     }

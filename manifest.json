@@ -1,11 +1,10 @@
 {
   "manifest_version": 3,
   "name": "github ownerless diff filter",
-  "version": "0.2",
+  "version": "0.1",
   "description": "show files in pull request diffs which have no code owners",
   "permissions": [
     "activeTab",
-    "scripting",
     "contextMenus"
   ],
   "background": {

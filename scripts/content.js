@@ -1,6 +1,3 @@
-// we use glob-to-regex.
-// original code: https://cdn.jsdelivr.net/npm/glob-to-regexp@0.4.1/index.min.js
-// the above code is meant for NodeJS. it was modified by ChatGPT (GPT-4o) to support chrome extensions.
 
 // fetch the CODEOWNERS file content
 async function getCodeOwners() {
@@ -8,18 +5,24 @@ async function getCodeOwners() {
     try {
         // Extract the base branch from the PR page
         const baseBranchElement = document.querySelector('.base-ref');
-        var baseBranch = null;
-        if (baseBranchElement){
+        let baseBranch = 'master';
+        if (baseBranchElement) {
             baseBranch = baseBranchElement.textContent.trim();
-            console.log('got the following base branch:', baseBranch)
-        }else{
-            baseBranch = 'master';
-            console.log('could not get base branch. defaulting to master.')
+            console.log('got the following base branch:', baseBranch);
+        } else {
+            console.log('could not get base branch. defaulting to master.');
         }
+
+        // Construct the raw URL.
+        let rawURL = window.location.href.replace(/\/pull\/.*$/, `/${baseBranch}/.github/CODEOWNERS`);
         
-        // Use the base branch in the raw URL
-        const rawURL = window.location.href.replace(/\/pull\/.*$/, `/${baseBranch}/.github/CODEOWNERS`)
-                                            .replace('github.com', 'raw.githubusercontent.com');
+        if (window.location.href.includes('cto-github.cisco.com')) {
+            rawURL = window.location.href.replace(/\/pull\/.*$/, `/raw/${baseBranch}/.github/CODEOWNERS`);
+        } else {
+            rawURL = rawURL.replace('github.com', 'raw.githubusercontent.com');
+        }
+
+        console.log("full CODEOWNERS raw path:", rawURL);
         const response = await fetch(rawURL);
 
         // Fetch the CODEOWNERS file content from GitHub
@@ -37,105 +40,165 @@ async function getCodeOwners() {
 }
 
 // filter files based on code owners
-async function filterFiles() {
+async function filterFiles(debug = false) {
     console.log('Filtering files...');
-    
-    // Get the CODEOWNERS file content
+
     const codeOwnersContent = await getCodeOwners();
-    console.log('CODEOWNERS file content:', codeOwnersContent);
+    if (debug){
+        console.log('CODEOWNERS file content:', codeOwnersContent);
+    }
     
     if (!codeOwnersContent) {
         console.log('Failed to fetch CODEOWNERS file content.');
         return;
     }
 
-    // Get all file rows
     const fileRows = document.querySelectorAll('.file-info');
     console.log('Found', fileRows.length, 'file rows.');
 
-    // Loop through each file row
     fileRows.forEach(row => {
-        // Get the filename element from .Truncate within .file-info
         const filenameElement = row.querySelector('.file-info .Truncate');
-        if (!filenameElement){
+        if (!filenameElement) {
           console.log('Could not get filenameElement.');
           return;
         }
         
-        var filenameSubElement = null;
-        for (var i = 0; i < filenameElement.childNodes.length; i++) {
-            if (filenameElement.childNodes[i].className == "Link--primary Truncate-text") {
+        let filenameSubElement = null;
+        for (let i = 0; i < filenameElement.childNodes.length; i++) {
+            if (filenameElement.childNodes[i].className === "Link--primary Truncate-text") {
               filenameSubElement = filenameElement.childNodes[i];
               break;
             }        
         }
 
-        if (!filenameSubElement){
+        if (!filenameSubElement) {
           console.log('Could not get filenameSubElement.');
           return;
         }
 
-        // Get the title attribute from the .Truncate element
         const filename = filenameSubElement.getAttribute('title');
-        if (!filename){
+        if (!filename) {
           console.log('Could not get filename.');
           return;
         }
 
-        console.log('Checking file:', filename);
-        const hasCodeOwner = checkCodeOwner(filename, codeOwnersContent);
+        const hasCodeOwners = checkCodeOwners(filename, codeOwnersContent, debug);
 
-        if (hasCodeOwner) {
-            // hide the file row.
+        if (hasCodeOwners) {
             console.log('Hiding file which has code owners:', filename);
             row.closest('.js-details-container').style.display = 'none';
         } else {
             console.log('File does not have code owners:', filename);
         }
+
     });
 }
 
-// check if a file has a code owner
-function checkCodeOwner(filename, codeOwnersContent) {
-    console.log('Checking code owner for file:', filename);
-    // Split CODEOWNERS content into lines
+function checkCodeOwners(filename, codeOwnersContent, debug) {
+    console.log('Checking code owners for file:', filename);
     const codeOwnersLines = codeOwnersContent.split('\n');
     
-    // Iterate through each line to find matching pattern
+    let matched = false;
+    let hasOwner = false;
+    
     for (let i = 0; i < codeOwnersLines.length; i++) {
-        const line = codeOwnersLines[i].trim();
+        let line = codeOwnersLines[i].trim();
         if (line === '' || line.startsWith('#')) {
             // Skip empty lines and comments
-            console.log("skipping empty line", i);
             continue; 
         }
         
         // Split each line by whitespace to get pattern and owners
-        const [pattern, ...owners] = line.split(/\s+/);
+        let [pattern, ...owners] = line.split(/\s+/);
+
+        // Handle inline comments
+        const commentIndex = pattern.indexOf('#');
+        if (commentIndex > -1) {
+            pattern = pattern.substring(0, commentIndex).trim();
+        }
+
+        if (pattern === '') {
+            continue;
+        }
 
         // Check if the filename matches any pattern
-        const regex = globToRegex(pattern, { extended: true });
-        console.log("testing pattern", regex);
+        const regex = convertGlobToRegExp(pattern);
+        if (debug){
+            console.log('testing regex:', regex);
+        }
 
         if (regex.test(filename)) {
-            // If the file matches a pattern, it might have a code owner.
+            matched = true;
             console.log('Match found:', line);
-            console.log("file owners:", owners)
-            if (owners.length > 0){
-                return true;
+            console.log('regex:', regex);
+            console.log("file owners:", owners);
+            if (owners.length > 0) {
+                hasOwner = true;
+            } else {
+                hasOwner = false;
             }
         }
     }
 
-    // If no match found, the file doesn't have a code owner
-    console.log('No match found for file:', filename);
-    return false;
+    return matched && hasOwner;
+}
+
+function convertGlobToRegExp(glob) {
+    let regexString = "(^|/)";
+    let inGroup = false;
+    let escapeNext = false;
+
+    for (let char of glob) {
+        if (escapeNext) {
+            regexString += "\\" + char;
+            escapeNext = false;
+        } else {
+            switch (char) {
+                case '\\':
+                    escapeNext = true;
+                    break;
+                case '*':
+                    regexString += ".*";
+                    break;
+                case '?':
+                    regexString += ".";
+                    break;
+                case '{':
+                    inGroup = true;
+                    regexString += "(";
+                    break;
+                case '}':
+                    inGroup = false;
+                    regexString += ")";
+                    break;
+                case ',':
+                    regexString += inGroup ? "|" : ",";
+                    break;
+                default:
+                    regexString += char;
+            }
+        }
+    }
+
+    // Allow for matching both directories and files within directories
+    if (!regexString.endsWith("/")) {
+        regexString += "(?:$|/.*$)";
+    } else {
+        regexString += ".*$";
+    }
+
+    return new RegExp(regexString);
 }
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'filterFiles') {
         filterFiles().then(() => sendResponse({status: 'filtering started'}));
-        return true; // Indicates that the response is asynchronous
+        // Indicates that the response is asynchronous.
+        return true;
+    } else if (request.action === 'filterFilesDebug') {
+        filterFiles(true).then(() => sendResponse({status: 'debug filtering started'}));
+        // Indicates that the response is asynchronous.
+        return true;
     }
 });
